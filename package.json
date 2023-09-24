@@ -11,6 +11,9 @@
   "keywords": [],
   "author": "jarvis",
   "license": "ISC",
+  "engines": {
+    "node": ">18"
+  },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "body-parser": "^1.20.2",
