@@ -28,6 +28,8 @@ const transactionSchema = new Schema(
         credit_card: { type: String },
         upi: { type: String },
         transaction_date: { type: Date, required: true },
+        starred: { type: Boolean, default: false },
+        members: [{ type: String }],
         tags: [String],
       },
     ],

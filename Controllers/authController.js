@@ -39,7 +39,9 @@ export const signIn = async (req, res) => {
       fetchUser[0].password
     );
     if (!isPasswordCorrect)
-      return res.status(401).json({ data: { errorMessage: "Invalid Credentials." } });
+      return res
+        .status(401)
+        .json({ data: { errorMessage: "Invalid Credentials." } });
 
     const token = jwt.sign(
       {
@@ -52,7 +54,13 @@ export const signIn = async (req, res) => {
     );
 
     res.status(200).json({
-      data: { name: fetchUser[0].name, token, message: "Login successful" },
+      data: {
+        name: fetchUser[0].name,
+        email: fetchUser[0].email,
+        mobileNumber: fetchUser[0].mobile_number,
+        token,
+        message: "Login successful",
+      },
     });
   } catch (error) {
     console.log(error);
@@ -122,7 +130,13 @@ export const signUp = async (req, res) => {
     );
 
     res.status(200).json({
-      data: { name: userCreated.name, token, message: "Signup successful" },
+      data: {
+        name: userCreated.name,
+        email: userCreated.email,
+        mobileNumber: userCreated.mobile_number,
+        token,
+        message: "Signup successful",
+      },
     });
   } catch (error) {
     if (error.name === "ValidationError") {
