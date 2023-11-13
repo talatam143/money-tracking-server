@@ -1,6 +1,10 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import dotEnv from "dotenv";
+import unirest from "unirest";
+import nodemailer from "nodemailer";
+import Mailgen from "mailgen";
+import moment from "moment";
 
 import { User } from "../Models/userModel.js";
 import {
@@ -43,6 +47,77 @@ export const signIn = async (req, res) => {
         .status(401)
         .json({ data: { errorMessage: "Invalid Credentials." } });
 
+    if (!fetchUser[0].isVerified) {
+      let generateOTP = Math.floor(Math.random() * (999999 - 111111) + 111111);
+
+      var sendOtp = unirest("GET", "https://www.fast2sms.com/dev/bulkV2");
+      sendOtp.query({
+        authorization: process.env.SMS_API,
+        message: `Use code ${generateOTP} to verify your signup on Money Tracker. It's valid for 5 mins. Please do no share the code`,
+        language: "english",
+        variables_values: generateOTP,
+        route: "otp",
+        numbers: fetchUser[0].mobile_number,
+      });
+      sendOtp.headers({
+        "cache-control": "no-cache",
+      });
+
+      const mailTransporter = nodemailer.createTransport({
+        host: "smtp.gmail.com",
+        port: 587,
+        secure: false,
+        auth: {
+          user: process.env.EMAIL,
+          pass: process.env.EMAIL_AUTH,
+        },
+      });
+
+      let MailGenerator = new Mailgen({
+        theme: "cerberus",
+        product: {
+          name: "Money Tracer",
+          link: "https://moneytracer.srimanikanta.in/",
+        },
+      });
+
+      async function sendEmail() {
+        await mailTransporter.sendMail({
+          from: "mernauthnoreply@gmail.com",
+          to: fetchUser[0].email,
+          subject: "OTP to Verify Account",
+          html: MailGenerator.generate({
+            body: {
+              name: fetchUser[0].name,
+              intro: `Use code ${generateOTP} to verify your signup on Money Tracker. It's valid for 5 mins.
+               Please do no share the code with anyone.`,
+              outro: "Looking forward to meet you.",
+            },
+          }),
+        });
+      }
+
+      const [otpStatus, emailStatus] = await Promise.all([
+        new Promise((resolve) => {
+          sendOtp.end(function (res) {
+            resolve(true);
+          });
+        }),
+        sendEmail()
+          .then(() => true)
+          .catch(() => false),
+      ]);
+
+      if (otpStatus || emailStatus) {
+        return res.status(401).json({
+          data: {
+            isVerified: false,
+            errorMessage:
+              "User is not verified. OTP sent to your mobile and email! verify it within 5 mins. ",
+          },
+        });
+      }
+    }
     const token = jwt.sign(
       {
         name: fetchUser[0].name,
@@ -108,36 +183,87 @@ export const signUp = async (req, res) => {
       });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 15);
-    const hashedMpin = await bcrypt.hash(mpin.toString(), 15);
-    const userCreated = await User.create({
-      name,
-      email,
-      mobile_number: mobileNumber,
-      date_of_birth: dateOfBirth,
-      password: hashedPassword,
-      mpin: hashedMpin,
+    let generateOTP = Math.floor(Math.random() * (999999 - 111111) + 111111);
+
+    var sendOtp = unirest("GET", "https://www.fast2sms.com/dev/bulkV2");
+    sendOtp.query({
+      authorization: process.env.SMS_API,
+      message: `Use code ${generateOTP} to verify your signup on Money Tracker. It's valid for 5 mins. Please do no share the code`,
+      language: "english",
+      variables_values: generateOTP,
+      route: "otp",
+      numbers: mobileNumber,
+    });
+    sendOtp.headers({
+      "cache-control": "no-cache",
     });
 
-    const token = jwt.sign(
-      {
-        name: userCreated.name,
-        email: userCreated.email,
-        mobileNumber: userCreated.mobile_number,
-      },
-      process.env.JWT_SECRET_KEY,
-      { expiresIn: "365d" }
-    );
-
-    res.status(200).json({
-      data: {
-        name: userCreated.name,
-        email: userCreated.email,
-        mobileNumber: userCreated.mobile_number,
-        token,
-        message: "Signup successful",
+    const mailTransporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,
+      auth: {
+        user: process.env.EMAIL,
+        pass: process.env.EMAIL_AUTH,
       },
     });
+
+    let MailGenerator = new Mailgen({
+      theme: "cerberus",
+      product: {
+        name: "Money Tracer",
+        link: "https://moneytracer.srimanikanta.in/",
+      },
+    });
+
+    async function sendEmail() {
+      await mailTransporter.sendMail({
+        from: "mernauthnoreply@gmail.com",
+        to: email,
+        subject: "OTP to Verify Account",
+        html: MailGenerator.generate({
+          body: {
+            name: name,
+            intro: `Use code ${generateOTP} to verify your signup on Money Tracker. It's valid for 5 mins.
+             Please do no share the code with anyone.`,
+            outro: "Looking forward to meet you.",
+          },
+        }),
+      });
+    }
+
+    const [otpStatus, emailStatus] = await Promise.all([
+      new Promise((resolve) => {
+        sendOtp.end(function (res) {
+          resolve(true);
+        });
+      }),
+      sendEmail()
+        .then(() => true)
+        .catch(() => false),
+    ]);
+
+    if (otpStatus || emailStatus) {
+      const hashedPassword = await bcrypt.hash(password, 15);
+      const hashedMpin = await bcrypt.hash(mpin.toString(), 5);
+      const hashedOtp = await bcrypt.hash(generateOTP.toString(), 5);
+      await User.create({
+        name,
+        email,
+        mobile_number: mobileNumber,
+        date_of_birth: dateOfBirth,
+        password: hashedPassword,
+        mpin: hashedMpin,
+        OTP: hashedOtp,
+      });
+
+      res.status(200).json({
+        data: {
+          message:
+            "OTP sent to your mobile and email! verify it within 5 mins.",
+        },
+      });
+    }
   } catch (error) {
     if (error.name === "ValidationError") {
       const validationErrors = {};
@@ -156,6 +282,71 @@ export const signUp = async (req, res) => {
   }
 };
 
+export const verifyUser = async (req, res) => {
+  const { email, otp } = req.body;
+  try {
+    const findUser = await User.findOne({ email: email });
+
+    if (!email || !otp)
+      return res.status(409).json({
+        data: {
+          errorMessage: "Email and OTP are required",
+        },
+      });
+    if (!findUser)
+      return res.status(409).json({
+        data: {
+          errorMessage:
+            "It appears that you do not have an account. Please sign up.",
+        },
+      });
+
+    var currentDate = new moment(Date.now());
+    var otpDate = new moment(findUser.updatedAt);
+    var duration = moment.duration(currentDate.diff(otpDate));
+    var minutes = duration.as("minutes");
+
+    if (minutes > 5)
+      return res
+        .status(404)
+        .json({ data: { errorMessage: "OTP expired. Click on resend OTP" } });
+
+    const isOtpCorrect = await bcrypt.compare(otp, findUser.OTP);
+    if (!isOtpCorrect) {
+      return res.status(404).json({ data: { errorMessage: "Invalid OTP." } });
+    } else {
+      findUser.isVerified = true;
+      findUser.OTP = "N/A";
+      await findUser.save();
+
+      const token = jwt.sign(
+        {
+          name: findUser.name,
+          email: findUser.email,
+          mobileNumber: findUser.mobile_number,
+        },
+        process.env.JWT_SECRET_KEY,
+        { expiresIn: "365d" }
+      );
+
+      return res.status(200).json({
+        data: {
+          token,
+          name: findUser.name,
+          email: findUser.email,
+          mobileNumber: findUser.mobile_number,
+          message: "Signup Successful",
+        },
+      });
+    }
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      data: { errorMessage: "Something went wrong.", error: error.message },
+    });
+  }
+};
+
 export const authenticateUser = async (req, res) => {
   const token = req.headers["authorization"];
   var authInfo = {};
@@ -168,23 +359,130 @@ export const authenticateUser = async (req, res) => {
     jwt.verify(
       token.split(" ")[1],
       process.env.JWT_SECRET_KEY,
-      function (error, decoded) {
-        if (!error) {
-          verify = true;
+      async function (error, decoded) {
+        if (error) {
+          return res.status(400).json({
+            error: "Invalid token or token Expired. Please Login again",
+          });
+        } else {
+          const findUser = await User.findOne({ email: decoded.email });
+          if (!findUser)
+            return res.status(400).json({
+              data: {
+                errorMessage: "Something went wrong.",
+              },
+            });
           authInfo = {
             email: decoded.email,
             mobileNumber: decoded.mobileNumber,
             name: decoded.name,
           };
+          return res
+            .status(200)
+            .json({ message: "Valid User", data: authInfo });
         }
       }
     );
-    if (!verify)
-      return res
-        .status(400)
-        .json({ error: "Invalid token or token Expired. Please Login again" });
-    res.status(200).json({ message: "Valid User", data: authInfo });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+};
+
+export const resendOTP = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const findUser = await User.findOne({ email: email });
+    if (!email)
+      return res.status(409).json({
+        data: {
+          errorMessage: "Email is required",
+        },
+      });
+    if (!findUser)
+      return res.status(409).json({
+        data: {
+          errorMessage:
+            "It appears that you do not have an account. Please sign up.",
+        },
+      });
+
+    let generateOTP = Math.floor(Math.random() * (999999 - 111111) + 111111);
+
+    var sendOtp = unirest("GET", "https://www.fast2sms.com/dev/bulkV2");
+    sendOtp.query({
+      authorization: process.env.SMS_API,
+      message: `Use code ${generateOTP} to verify your signup on Money Tracker. It's valid for 5 mins. Please do no share the code`,
+      language: "english",
+      variables_values: generateOTP,
+      route: "otp",
+      numbers: findUser.mobile_number,
+    });
+    sendOtp.headers({
+      "cache-control": "no-cache",
+    });
+
+    const mailTransporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,
+      auth: {
+        user: process.env.EMAIL,
+        pass: process.env.EMAIL_AUTH,
+      },
+    });
+
+    let MailGenerator = new Mailgen({
+      theme: "cerberus",
+      product: {
+        name: "Money Tracer",
+        link: "https://moneytracer.srimanikanta.in/",
+      },
+    });
+
+    async function sendEmail() {
+      await mailTransporter.sendMail({
+        from: "mernauthnoreply@gmail.com",
+        to: email,
+        subject: "OTP to Verify Account",
+        html: MailGenerator.generate({
+          body: {
+            name: findUser.name,
+            intro: `Use code ${generateOTP} to verify your signup on Money Tracker. It's valid for 5 mins.
+               Please do no share the code with anyone.`,
+            outro: "Looking forward to meet you.",
+          },
+        }),
+      });
+    }
+
+    const [otpStatus, emailStatus] = await Promise.all([
+      new Promise((resolve) => {
+        sendOtp.end(function (res) {
+          resolve(true);
+        });
+      }),
+      sendEmail()
+        .then(() => true)
+        .catch(() => false),
+    ]);
+
+    if (otpStatus || emailStatus) {
+      const hashedOtp = await bcrypt.hash(generateOTP.toString(), 5);
+      findUser.OTP = hashedOtp;
+      findUser.save();
+
+      res.status(200).json({
+        data: {
+          message:
+            "OTP sent to your mobile and email! verify it within 5 mins.",
+        },
+      });
+    }
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      data: { errorMessage: "Something went wrong.", error: error.message },
+    });
   }
 };

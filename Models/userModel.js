@@ -48,6 +48,8 @@ const userSchema = new Schema(
     credit_cards: [
       { type: String, required: [true, "Credit name is required"] },
     ],
+    OTP: { type: String, required: true },
+    isVerified: { type: Boolean, required: true, default: false },
   },
   { timestamps: true }
 );
