@@ -113,7 +113,7 @@ export const getUserDetails = async (req, res) => {
     if (userDetails.upi_app.length > 0) data.upiDetails = userDetails.upi_app;
     if (userDetails.credit_cards.length > 0)
       data.creditCards = userDetails.credit_cards;
-    return res.status(200).json(data);
+    return res.status(200).json({ data });
   } catch (error) {
     res.status(500).json({
       data: { errorMessage: "Something went wrong", error: error.message },
@@ -131,7 +131,7 @@ export const forceUpdate = async (req, res) => {
     const fetchUser = await User.findOne({ email: authInfo.email });
     if (!fetchUser)
       return res.status(409).json({ data: { errorMessage: "No user found." } });
-    
+
     var field = Object.keys(details)?.[0];
     if (field) {
       if (field === "upiDetails") {
@@ -162,11 +162,9 @@ export const forceUpdate = async (req, res) => {
           data.upiDetails = userDetails.upi_app;
         if (userDetails.credit_cards.length > 0)
           data.creditCards = userDetails.credit_cards;
+        data.message = `Updated ${schemaFormation.fieldType} details successfully.`;
         return res.status(200).json({
-          data: {
-            data,
-            message: `Updated ${schemaFormation.fieldType} details successfully.`,
-          },
+          data,
         });
       };
 
