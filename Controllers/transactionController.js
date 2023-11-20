@@ -2,14 +2,106 @@ import { Transaction } from "../Models/transactionModel.js";
 
 export const getTransactions = async (req, res) => {
   const { ...authInfo } = req.authInfo;
+  const { ...queries } = req.query;
+  console.log(queries);
   try {
     const userTransactions = await Transaction.findOne({
       email: authInfo.email,
     });
+
+    let filterMatch = {};
+    if (queries?.searchfield && isNaN(queries?.searchfield)) {
+      filterMatch["transactions.title"] = { $regex: new RegExp(`${queries.searchfield}`, "i") };
+    } else if (queries?.searchfield) {
+      filterMatch["transactions.amount"] = Number(queries.searchfield);
+    } else if (queries.fromdate && queries?.todate) {
+      filterMatch["transactions.transaction_date"] = {
+        $gte: new Date(queries.fromdate),
+        $lt: new Date(queries?.todate),
+      };
+    } else if (queries.paymentmethod) {
+      filterMatch["transactions.payment_method"] = paymentmethod;
+    } else if (queries.bank) {
+      filterMatch["transactions.bank"] = bank;
+    } else if (queries.upi) {
+      filterMatch["transactions.upi"] = upi;
+    } else if (queries.creditcard) {
+      filterMatch["transactions.credit_card"] = creditcard;
+    } else if (queries.category) {
+      filterMatch["transactions.category"] = category;
+    } else if (queries.starred) {
+      filterMatch["transactions.starred"] = starred;
+    }
+
+    let agg = [
+      {
+        $match: {
+          email: "contact2manikanta@gmail.com",
+        },
+      },
+      {
+        $project: {
+          transactions: "$transactions",
+          transactionCount: {
+            $size: "$transactions",
+          },
+        },
+      },
+      {
+        $unwind: {
+          path: "$transactions",
+        },
+      },
+      {
+        $match: filterMatch,
+      },
+      {
+        $skip: queries?.skip ? Number(queries.skip) : 0,
+      },
+      {
+        $limit: 15,
+      },
+      {
+        $group: {
+          _id: "$_id",
+          transactionCount: {
+            $first: "$transactionCount",
+          },
+          transactions: {
+            $push: "$transactions",
+          },
+        },
+      },
+    ];
+
+    if (queries.filtertype === "amount") {
+      agg = [
+        ...agg.slice(0, 4),
+        {
+          $sort: { "transactions.amount": queries?.order === "desc" ? -1 : 1 },
+        },
+        ...agg.slice(4),
+      ];
+    } else if (queries.filtertype === "transactiondate") {
+      agg = [
+        ...agg.slice(0, 4),
+        {
+          $sort: {
+            "transactions.transaction_date": queries?.order === "desc" ? -1 : 1,
+          },
+        },
+        ...agg.slice(4),
+      ];
+    }
+
+    console.log("Aggregation is \n", agg);
+
+    const cursor = await Transaction.aggregate(agg);
+
     if (!userTransactions)
       return res.status(404).json({ errorMessage: "No Transactions found." });
     res.status(200).json({
-      data: userTransactions,
+      data: cursor[0],
     });
   } catch (error) {
     if (error.name === "ValidationError") {
@@ -34,8 +126,10 @@ export const addTransaction = async (req, res) => {
     req.body;
   const { ...authInfo } = req.authInfo;
   try {
-    if (!title || !amount || !paymentMethod || !transactionDate)
-      return res.status(400).json({ errorMessage: "All fields are required." });
+    if (!title || !amount || !transactionDate)
+      return res
+        .status(400)
+        .json({ data: { errorMessage: "All fields are required." } });
     const fetchUser = await Transaction.findOne({ email: authInfo.email });
     let transactionObject = {
       title,
@@ -43,16 +137,13 @@ export const addTransaction = async (req, res) => {
       payment_method: paymentMethod,
       transaction_date: transactionDate,
     };
-    payload.description
-      ? (transactionObject.description = payload.description)
-      : null;
-    payload.category ? (transactionObject.category = payload.category) : null;
-    payload.bank ? (transactionObject.bank = payload.bank) : null;
-    payload.upi ? (transactionObject.upi = payload.upi) : null;
-    payload.creditCard
-      ? (transactionObject.credit_Card = payload.creditCard)
-      : null;
-    payload.tags ? (transactionObject.tags = payload.tags) : null;
+    if (paymentMethod === "UPI" && payload.paymentInfo) {
+      transactionObject.upi = payload?.paymentInfo;
+    } else if (paymentMethod === "Credit Card" && payload?.paymentInfo) {
+      transactionObject.credit_card = payload?.paymentInfo;
+    }
+    delete payload.paymentInfo;
+    transactionObject = { ...transactionObject, ...payload };
 
     if (fetchUser) {
       var updateUserTransaction = await Transaction.findOneAndUpdate(
@@ -69,8 +160,10 @@ export const addTransaction = async (req, res) => {
       });
     }
     return res.status(200).json({
-      message: "Transaction added successfully",
-      data: updateUserTransaction || newUserTransaction,
+      data: {
+        message: "Transaction added successfully",
+        data: updateUserTransaction || newUserTransaction,
+      },
     });
   } catch (error) {
     if (error.name === "ValidationError") {
