@@ -3,48 +3,36 @@ import { Transaction } from "../Models/transactionModel.js";
 export const getTransactions = async (req, res) => {
   const { ...authInfo } = req.authInfo;
   const { ...queries } = req.query;
-  console.log(queries);
+  const sortObject = {
+    amount: { dbName: "transactions.amount" },
+    transactiondate: { dbName: "transactions.transaction_date" },
+  };
+  const matchObject = {
+    date: { dbName: "transactions.transaction_date" },
+    paymentmethod: { dbName: "transactions.payment_method" },
+    bank: { dbName: "transactions.bank" },
+    upi: { dbName: "transactions.upi" },
+    creditcard: { dbName: "transactions.credit_card" },
+    category: { dbName: "transactions.category" },
+    starred: { dbName: "transactions.starred" },
+    searchfield: {
+      dbString: "transactions.title",
+      dbNumber: "transactions.amount",
+    },
+    fromdate: { dbName: "transactions.transaction_date" },
+  };
+
   try {
     const userTransactions = await Transaction.findOne({
       email: authInfo.email,
     });
 
-    let filterMatch = {};
-    if (queries?.searchfield && isNaN(queries?.searchfield)) {
-      filterMatch["transactions.title"] = { $regex: new RegExp(`${queries.searchfield}`, "i") };
-    } else if (queries?.searchfield) {
-      filterMatch["transactions.amount"] = Number(queries.searchfield);
-    } else if (queries.fromdate && queries?.todate) {
-      filterMatch["transactions.transaction_date"] = {
-        $gte: new Date(queries.fromdate),
-        $lt: new Date(queries?.todate),
-      };
-    } else if (queries.paymentmethod) {
-      filterMatch["transactions.payment_method"] = paymentmethod;
-    } else if (queries.bank) {
-      filterMatch["transactions.bank"] = bank;
-    } else if (queries.upi) {
-      filterMatch["transactions.upi"] = upi;
-    } else if (queries.creditcard) {
-      filterMatch["transactions.credit_card"] = creditcard;
-    } else if (queries.category) {
-      filterMatch["transactions.category"] = category;
-    } else if (queries.starred) {
-      filterMatch["transactions.starred"] = starred;
-    }
+    const skip = Number(queries?.skip ?? 0);
 
     let agg = [
       {
         $match: {
-          email: "contact2manikanta@gmail.com",
-        },
-      },
-      {
-        $project: {
-          transactions: "$transactions",
-          transactionCount: {
-            $size: "$transactions",
-          },
+          email: userTransactions.email,
         },
       },
       {
@@ -53,48 +41,104 @@ export const getTransactions = async (req, res) => {
         },
       },
       {
-        $match: filterMatch,
-      },
-      {
-        $skip: queries?.skip ? Number(queries.skip) : 0,
-      },
-      {
-        $limit: 15,
+        $match: {},
       },
       {
         $group: {
           _id: "$_id",
-          transactionCount: {
-            $first: "$transactionCount",
-          },
           transactions: {
             $push: "$transactions",
           },
+          filteredTransactionCount: {
+            $sum: 1,
+          },
+        },
+      },
+      {
+        $project: {
+          _id: "$_id",
+          transaction: {
+            $slice: ["$transactions", skip, 10],
+          },
+          filteredTransactionCount: "$filteredTransactionCount",
         },
       },
     ];
 
-    if (queries.filtertype === "amount") {
-      agg = [
-        ...agg.slice(0, 4),
-        {
-          $sort: { "transactions.amount": queries?.order === "desc" ? -1 : 1 },
+    let matchCriteria = {};
+    let sortCriteria = {};
+    let isMatchCriteria = false;
+
+    if (Object.keys(queries).length > 0) {
+      Object.keys(queries).forEach((eachQuery) => {
+        if (Object.keys(matchObject).includes(eachQuery)) {
+          if (eachQuery === "searchfield") {
+            if (isNaN(queries[eachQuery])) {
+              matchCriteria[matchObject[eachQuery].dbString] = {
+                $regex: new RegExp(`${queries.searchfield}`, "i"),
+              };
+            } else {
+              matchCriteria[matchObject[eachQuery].dbNumber] = Number(
+                queries[eachQuery]
+              );
+            }
+          } else if (eachQuery === "fromdate" || eachQuery === "date") {
+            let today = new Date(queries.date);
+            const nextDay = new Date(today);
+            nextDay.setDate(today.getDate() + 1);
+            matchCriteria[matchObject[eachQuery].dbName] = {
+              $gte: new Date(queries?.fromdate),
+              $lte:
+                eachQuery === "fromdate"
+                  ? new Date(queries?.todate)
+                  : new Date(nextDay),
+            };
+          } else if (eachQuery === "starred") {
+            matchCriteria[matchObject[eachQuery].dbName] = JSON.parse(
+              queries[eachQuery]
+            );
+          } else {
+            matchCriteria[matchObject[eachQuery].dbName] = queries[eachQuery];
+          }
+        }
+      });
+      agg[2] = {
+        $match: matchCriteria,
+      };
+      isMatchCriteria = true;
+    }
+
+    if (Object.keys(sortObject).includes(queries.sort)) {
+      let order = queries.order === "desc" ? -1 : 1;
+      let sortType = sortObject[queries.sort].dbName;
+      sortCriteria = {
+        $sort: {
+          [sortType]: order,
         },
-        ...agg.slice(4),
-      ];
-    } else if (queries.filtertype === "transactiondate") {
+      };
+      agg = [...agg.slice(0, 3), sortCriteria, ...agg.slice(3)];
+    } else if (!isMatchCriteria) {
       agg = [
-        ...agg.slice(0, 4),
         {
-          $sort: {
-            "transactions.transaction_date": queries?.order === "desc" ? -1 : 1,
+          $match: {
+            email: userTransactions.email,
           },
         },
-        ...agg.slice(4),
+        {
+          $project: {
+            _id: "$_id",
+            transactions: {
+              $slice: ["$transactions", skip, 10],
+            },
+            totalTransactions: {
+              $size: "$transactions",
+            },
+          },
+        },
       ];
     }
 
-    console.log("Aggregation is \n", agg);
+    console.log(agg);
 
     const cursor = await Transaction.aggregate(agg);
 
