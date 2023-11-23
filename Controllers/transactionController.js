@@ -57,10 +57,10 @@ export const getTransactions = async (req, res) => {
       {
         $project: {
           _id: "$_id",
-          transaction: {
-            $slice: ["$transactions", skip, 10],
+          transactionsCount: "$filteredTransactionCount",
+          transactions: {
+            $slice: ["$transactions", skip, 20],
           },
-          filteredTransactionCount: "$filteredTransactionCount",
         },
       },
     ];
@@ -127,18 +127,16 @@ export const getTransactions = async (req, res) => {
         {
           $project: {
             _id: "$_id",
-            transactions: {
-              $slice: ["$transactions", skip, 10],
-            },
-            totalTransactions: {
+            transactionsCount: {
               $size: "$transactions",
+            },
+            transactions: {
+              $slice: ["$transactions", skip, 20],
             },
           },
         },
       ];
     }
-
-    console.log(agg);
 
     const cursor = await Transaction.aggregate(agg);
 
