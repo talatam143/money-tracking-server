@@ -354,7 +354,11 @@ export const authenticateUser = async (req, res) => {
     if (token === undefined)
       return res
         .status(400)
-        .json({ error: "Please provide token or login to access content" });
+        .json({
+          data: {
+            errorMessage: "Please provide token or login to access content",
+          },
+        });
     let verify = false;
     jwt.verify(
       token.split(" ")[1],
@@ -362,7 +366,10 @@ export const authenticateUser = async (req, res) => {
       async function (error, decoded) {
         if (error) {
           return res.status(400).json({
-            error: "Invalid token or token Expired. Please Login again",
+            data: {
+              errorMessage:
+                "Invalid token or token Expired. Please Login again",
+            },
           });
         } else {
           const findUser = await User.findOne({ email: decoded.email });
@@ -379,12 +386,12 @@ export const authenticateUser = async (req, res) => {
           };
           return res
             .status(200)
-            .json({ message: "Valid User", data: authInfo });
+            .json({ data: { message: "Valid User", ...authInfo } });
         }
       }
     );
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json({ data: { errorMessage: err.message } });
   }
 };
 

@@ -27,6 +27,11 @@ export const getTransactions = async (req, res) => {
       email: authInfo.email,
     });
 
+    if (!userTransactions)
+      return res
+        .status(202)
+        .json({ data: { errorMessage: "No Transactions found." } });
+
     const skip = Number(queries?.skip ?? 0);
 
     let agg = [
@@ -138,13 +143,22 @@ export const getTransactions = async (req, res) => {
       ];
     }
 
-    const cursor = await Transaction.aggregate(agg);
+    const fetchTransactions = await Transaction.aggregate(agg);
 
-    if (!userTransactions)
-      return res.status(404).json({ errorMessage: "No Transactions found." });
-    res.status(200).json({
-      data: cursor[0],
-    });
+    console.log(fetchTransactions);
+
+    if (
+      fetchTransactions?.[0]?.transactionsCount > 0 ||
+      fetchTransactions?.[0]?.transactions.length > 0
+    ) {
+      res.status(200).json({
+        data: fetchTransactions[0],
+      });
+    } else {
+      return res
+        .status(202)
+        .json({ data: { errorMessage: "No Transactions found." } });
+    }
   } catch (error) {
     if (error.name === "ValidationError") {
       const validationErrors = {};
@@ -152,14 +166,14 @@ export const getTransactions = async (req, res) => {
         validationErrors.field = field;
         validationErrors.message = error.errors[field].message;
       }
-      return res
-        .status(422)
-        .json({ errorType: "Validation failed", errors: validationErrors });
+      return res.status(422).json({
+        data: { errorType: "Validation failed", errors: validationErrors },
+      });
     }
     console.log(error);
-    res
-      .status(500)
-      .json({ errorMessage: "Something went wrong", error: error.message });
+    res.status(500).json({
+      data: { errorMessage: "Something went wrong", error: error.message },
+    });
   }
 };
 
@@ -214,14 +228,14 @@ export const addTransaction = async (req, res) => {
         validationErrors.field = field;
         validationErrors.message = error.errors[field].message;
       }
-      return res
-        .status(422)
-        .json({ errorType: "Validation failed", errors: validationErrors });
+      return res.status(422).json({
+        data: { errorMessage: "Validation failed", errors: validationErrors },
+      });
     }
     console.log(error);
-    res
-      .status(500)
-      .json({ errorMessage: "Something went wrong", error: error.message });
+    res.status(500).json({
+      data: { errorMessage: "Something went wrong", error: error.message },
+    });
   }
 };
 
