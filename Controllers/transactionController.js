@@ -145,8 +145,6 @@ export const getTransactions = async (req, res) => {
 
     const fetchTransactions = await Transaction.aggregate(agg);
 
-    console.log(fetchTransactions);
-
     if (
       fetchTransactions?.[0]?.transactionsCount > 0 ||
       fetchTransactions?.[0]?.transactions.length > 0
@@ -155,9 +153,9 @@ export const getTransactions = async (req, res) => {
         data: fetchTransactions[0],
       });
     } else {
-      return res
-        .status(202)
-        .json({ data: { errorMessage: "No Transactions found." } });
+      return res.status(200).json({
+        data: { message: "No Transactions found.", transactions: [] },
+      });
     }
   } catch (error) {
     if (error.name === "ValidationError") {
@@ -278,11 +276,15 @@ export const deleteTransaction = async (req, res) => {
     );
     if (!deleteUserTransaction)
       return res.status(404).json({
-        errorMessage: "No Transaction found",
+        data: {
+          errorMessage: "No Transaction found",
+        },
       });
     res.status(200).json({
-      message: "Transaction deleted successfully",
-      data: deleteUserTransaction,
+      data: {
+        message: "Transaction deleted successfully",
+        data: deleteUserTransaction,
+      },
     });
   } catch (error) {
     res

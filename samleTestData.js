@@ -1,7 +1,7 @@
 var myHeaders = new Headers();
 myHeaders.append(
   "Authorization",
-  "bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiU3JpIE1hbmlrYW50YSIsImVtYWlsIjoiY29udGFjdDJtYW5pa2FudGFAZ21haWwuY29tIiwibW9iaWxlTnVtYmVyIjo4MDU2Njc3MTg5LCJpYXQiOjE3MDAwNTIzNjcsImV4cCI6MTczMTU4ODM2N30.1SOvLu6U3pBseQDptQq5WxrXKSYMBi7myyPBn4nJtc4"
+  "bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiU3JpIE1hbmlrYW50YSIsImVtYWlsIjoiY29jamFydmlzMTQzQGdtYWlsLmNvbSIsIm1vYmlsZU51bWJlciI6ODE5MDg4NTg2NiwiaWF0IjoxNzA1NjQzNzQ5LCJleHAiOjE3MzcxNzk3NDl9.motWnJWrFHbuVxh1KN1dY_paKL142YWDEL-zHLBYc3E"
 );
 myHeaders.append("Content-Type", "application/json");
 
@@ -13618,7 +13618,7 @@ const sampleData = [
 ];
 
 async function processAllData() {
-  for (let i = 0; i < sampleData.length; i++) {
+  for (let i = 0; i < 100; i++) {
     try {
       await postData(sampleData[i]);
       console.log(`Record ${i + 1} processed.`);
@@ -13630,7 +13630,6 @@ async function processAllData() {
 
 // Call the function to start the process
 processAllData();
-
 
 // JG.repeat(1000, {
 //   title : JG.random("Coffee shop",
