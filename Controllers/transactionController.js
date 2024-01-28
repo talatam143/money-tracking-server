@@ -9,11 +9,11 @@ export const getTransactions = async (req, res) => {
   };
   const matchObject = {
     date: { dbName: "transactions.transaction_date" },
-    paymentmethod: { dbName: "transactions.payment_method" },
-    bank: { dbName: "transactions.bank" },
-    upi: { dbName: "transactions.upi" },
-    creditcard: { dbName: "transactions.credit_card" },
-    category: { dbName: "transactions.category" },
+    paymentMethods: { dbName: "transactions.payment_method" },
+    banks: { dbName: "transactions.bank" },
+    UPI: { dbName: "transactions.upi" },
+    creditCards: { dbName: "transactions.credit_card" },
+    categories: { dbName: "transactions.category" },
     starred: { dbName: "transactions.starred" },
     searchfield: {
       dbString: "transactions.title",
@@ -88,22 +88,27 @@ export const getTransactions = async (req, res) => {
               );
             }
           } else if (eachQuery === "fromdate" || eachQuery === "date") {
-            let today = new Date(queries.date);
-            const nextDay = new Date(today);
-            nextDay.setDate(today.getDate() + 1);
+            let toDate = new Date(
+              eachQuery === "fromdate"
+                ? queries.todate || new Date()
+                : queries.date
+            );
+            const nextToDate = new Date(toDate);
+            nextToDate.setDate(toDate.getDate() + 1);
             matchCriteria[matchObject[eachQuery].dbName] = {
-              $gte: new Date(queries?.fromdate),
-              $lte:
-                eachQuery === "fromdate"
-                  ? new Date(queries?.todate)
-                  : new Date(nextDay),
+              $gte: new Date(
+                eachQuery === "fromdate" ? queries?.fromdate : queries?.date
+              ),
+              $lte: new Date(nextToDate),
             };
           } else if (eachQuery === "starred") {
             matchCriteria[matchObject[eachQuery].dbName] = JSON.parse(
               queries[eachQuery]
             );
           } else {
-            matchCriteria[matchObject[eachQuery].dbName] = queries[eachQuery];
+            matchCriteria[matchObject[eachQuery].dbName] = {
+              $in: queries[eachQuery],
+            };
           }
         }
       });
