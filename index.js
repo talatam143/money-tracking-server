@@ -7,6 +7,7 @@ import bodyParser from "body-parser";
 import authRouter from "./routes/authRoutes.js";
 import userRouter from "./routes/userRoutes.js";
 import transactionRouter from "./routes/transactionRoutes.js";
+import analyticsRoutes from "./routes/analyticsRoutes.js";
 
 const app = express();
 dotEnv.config();
@@ -23,7 +24,8 @@ mongoose
 
 app.use("/auth", authRouter);
 app.use("/user", userRouter);
-app.use("/transaction",transactionRouter)
+app.use("/transaction", transactionRouter);
+app.use("/analytics", analyticsRoutes);
 
 app.listen(process.env.PORT, (err) => {
   if (!err) {
