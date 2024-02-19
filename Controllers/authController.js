@@ -109,10 +109,10 @@ export const signIn = async (req, res) => {
       ]);
 
       if (otpStatus || emailStatus) {
-        return res.status(401).json({
+        return res.status(202).json({
           data: {
             isVerified: false,
-            errorMessage:
+            message:
               "User is not verified. OTP sent to your mobile and email! verify it within 5 mins. ",
           },
         });
@@ -352,13 +352,11 @@ export const authenticateUser = async (req, res) => {
   var authInfo = {};
   try {
     if (token === undefined)
-      return res
-        .status(400)
-        .json({
-          data: {
-            errorMessage: "Please provide token or login to access content",
-          },
-        });
+      return res.status(400).json({
+        data: {
+          errorMessage: "Please provide token or login to access content",
+        },
+      });
     let verify = false;
     jwt.verify(
       token.split(" ")[1],
@@ -490,6 +488,104 @@ export const resendOTP = async (req, res) => {
     console.log(error);
     res.status(500).json({
       data: { errorMessage: "Something went wrong.", error: error.message },
+    });
+  }
+};
+
+export const verifyOTP = async (req, res) => {
+  const { email, otp } = req.body;
+  try {
+    const findUser = await User.findOne({ email: email });
+
+    if (!email || !otp)
+      return res.status(409).json({
+        data: {
+          errorMessage: "Email and OTP are required",
+        },
+      });
+    if (!findUser)
+      return res.status(409).json({
+        data: {
+          errorMessage:
+            "It appears that you do not have an account. Please sign up.",
+        },
+      });
+
+    var currentDate = new moment(Date.now());
+    var otpDate = new moment(findUser.updatedAt);
+    var duration = moment.duration(currentDate.diff(otpDate));
+    var minutes = duration.as("minutes");
+
+    if (minutes > 5)
+      return res
+        .status(404)
+        .json({ data: { errorMessage: "OTP expired. Click on resend OTP" } });
+
+    const isOtpCorrect = await bcrypt.compare(otp, findUser.OTP);
+    if (!isOtpCorrect) {
+      return res.status(404).json({ data: { errorMessage: "Invalid OTP." } });
+    } else {
+      return res.status(200).json({
+        data: {
+          message: "OTP Verified",
+        },
+      });
+    }
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      data: { errorMessage: "Something went wrong.", error: error.message },
+    });
+  }
+};
+
+export const changePassword = async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const findUser = await User.findOne({ email: email });
+
+    if (!passwordValidator(password))
+      return res.status(400).json({
+        errorType: "Validation failed",
+        errors: {
+          field: "Password",
+          message:
+            "Password must have 8+ chars with 1 uppercase, 1 lowercase, 1 digit, and 1 special character.",
+        },
+      });
+
+    const isOldPassword = await bcrypt.compare(password, findUser.password);
+
+    if (isOldPassword)
+      return res.status(400).json({
+        data: {
+          errorMessage: "Old password and new password should not be same.",
+        },
+      });
+
+    const newHashedPassword = await bcrypt.hash(password, 15);
+    findUser.password = newHashedPassword;
+    await findUser.save();
+
+    return res.status(200).json({
+      data: {
+        message: "Your password is changed Successful. Please login",
+      },
+    });
+  } catch (error) {
+    if (error.name === "ValidationError") {
+      const validationErrors = {};
+      for (const field in error.errors) {
+        validationErrors.field = field;
+        validationErrors.message = error.errors[field].message;
+      }
+      return res
+        .status(422)
+        .json({ errorType: "Validation failed", errors: validationErrors });
+    }
+    console.log(error);
+    res.status(500).json({
+      data: { errorMessage: "Something went wrong", error: error.message },
     });
   }
 };

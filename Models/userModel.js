@@ -50,6 +50,7 @@ const userSchema = new Schema(
     ],
     OTP: { type: String, required: true },
     isVerified: { type: Boolean, required: true, default: false },
+    oauthUser: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

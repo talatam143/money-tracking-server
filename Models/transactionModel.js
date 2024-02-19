@@ -23,7 +23,7 @@ const transactionSchema = new Schema(
         title: { type: String, required: true },
         description: { type: String },
         category: { type: String },
-        payment_method: { type: String, required: true },
+        payment_method: { type: String },
         bank: { type: String },
         credit_card: { type: String },
         upi: { type: String },

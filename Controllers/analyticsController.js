@@ -300,7 +300,7 @@ export const chartAnalytics = async (req, res) => {
     var agg = [
       {
         $match: {
-          email: "contact2manikanta@gmail.com",
+          email: authInfo.email,
         },
       },
       {
@@ -311,6 +311,22 @@ export const chartAnalytics = async (req, res) => {
       {
         $project: {
           transactions: 1,
+        },
+      },
+      {
+        $match: {
+          "transactions.category": {
+            $exists: true,
+            $ne: null,
+          },
+          "transactions.payment_method": {
+            $exists: true,
+            $ne: null,
+          },
+          "transactions.bank": {
+            $exists: true,
+            $ne: null,
+          },
         },
       },
       {
@@ -365,7 +381,16 @@ export const chartAnalytics = async (req, res) => {
     ];
 
     const response = await Transaction.aggregate(agg);
-    res.status(200).json({ data: response?.[0] });
+
+    let responseData = response?.[0];
+
+    Object.keys(responseData).forEach((eachData) => {
+      responseData[eachData].filter((entry) => {
+        entry._id !== "null";
+      });
+    });
+
+    res.status(200).json({ data: responseData });
   } catch (error) {
     console.log(error);
     res.status(500).json({

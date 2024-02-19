@@ -1,4 +1,5 @@
 import { Transaction } from "../Models/transactionModel.js";
+import { ObjectId, Types } from "mongoose";
 
 export const getTransactions = async (req, res) => {
   const { ...authInfo } = req.authInfo;
@@ -74,7 +75,7 @@ export const getTransactions = async (req, res) => {
     let sortCriteria = {};
     let isMatchCriteria = false;
 
-    if (Object.keys(queries).length > 0) {
+    if (Object.keys(queries).length > 1) {
       Object.keys(queries).forEach((eachQuery) => {
         if (Object.keys(matchObject).includes(eachQuery)) {
           if (eachQuery === "searchfield") {
@@ -209,7 +210,14 @@ export const addTransaction = async (req, res) => {
         {
           email: authInfo.email,
         },
-        { $push: { transactions: transactionObject } },
+        {
+          $push: {
+            transactions: {
+              $each: [transactionObject],
+              $sort: { transaction_date: -1 },
+            },
+          },
+        },
         { new: true }
       );
     } else {
@@ -244,25 +252,52 @@ export const addTransaction = async (req, res) => {
 
 export const updateTransaction = async (req, res) => {
   const { id } = req.params;
-  const { ...data } = req.body;
+  const { title, amount, paymentMethod, transactionDate, ...payload } =
+    req.body;
   const { ...authInfo } = req.authInfo;
   try {
-    let updatedData = {};
-    for (const key in data) {
-      updatedData[`transactions.$.${key}`] = data[key];
+    if (!title || !amount || !transactionDate)
+      return res
+        .status(400)
+        .json({ data: { errorMessage: "All fields are required." } });
+
+    let transactionObject = {
+      title,
+      amount,
+      payment_method: paymentMethod,
+      transaction_date: transactionDate,
+    };
+
+    if (paymentMethod === "UPI" && payload.paymentInfo) {
+      transactionObject.upi = payload?.paymentInfo;
+    } else if (paymentMethod === "Credit Card" && payload?.paymentInfo) {
+      transactionObject.credit_card = payload?.paymentInfo;
     }
+
+    delete payload.paymentInfo;
+    transactionObject = { ...transactionObject, ...payload };
+
     const updateUserTransaction = await Transaction.findOneAndUpdate(
       { email: authInfo.email, "transactions._id": id },
-      { $set: updatedData },
+      { $set: { "transactions.$": { _id: id, ...transactionObject } } },
       { new: true }
     );
     if (!updateUserTransaction)
       return res.status(404).json({
-        errorMessage: "No Transaction found",
+        data: {
+          errorMessage: "No Transaction found",
+        },
       });
+
+    const updatedTransaction = updateUserTransaction.transactions.find(
+      (transaction) => transaction._id.toString() === id
+    );
+
     res.status(200).json({
-      message: "Transaction updated successfully",
-      data: updateUserTransaction,
+      data: {
+        message: "Transaction updated successfully",
+        data: updatedTransaction,
+      },
     });
   } catch (error) {
     res
@@ -275,23 +310,35 @@ export const deleteTransaction = async (req, res) => {
   const { id } = req.params;
   const { ...authInfo } = req.authInfo;
   try {
-    const deleteUserTransaction = await Transaction.findOneAndUpdate(
-      { email: authInfo.email },
-      { $pull: { transactions: { _id: id } }, new: true }
-    );
-    if (!deleteUserTransaction)
+    const checkTransactionId = await Transaction.find({
+      email: authInfo.email,
+      transactions: {
+        $elemMatch: {
+          _id: new Types.ObjectId(id),
+        },
+      },
+    });
+
+    if (checkTransactionId.length === 0)
       return res.status(404).json({
         data: {
           errorMessage: "No Transaction found",
         },
       });
-    res.status(200).json({
+
+    await Transaction.findOneAndUpdate(
+      { email: authInfo.email },
+      { $pull: { transactions: { _id: id } } },
+      { new: true }
+    );
+
+    return res.status(200).json({
       data: {
-        message: "Transaction deleted successfully",
-        data: deleteUserTransaction,
+        message: "Transaction deleted successfully.",
       },
     });
   } catch (error) {
+    console.log(error);
     res
       .status(500)
       .json({ errorMessage: "Something went wrong", error: error.message });
