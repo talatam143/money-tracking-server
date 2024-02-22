@@ -14,7 +14,7 @@ export const transactionsAnalytics = async (req, res) => {
 
     var agg;
 
-    if (userTransactions?.transactions?.length > 10) {
+    if (userTransactions?.transactions?.length >= 10) {
       agg = [
         {
           $match: {
