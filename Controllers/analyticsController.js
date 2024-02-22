@@ -275,7 +275,7 @@ export const transactionsAnalytics = async (req, res) => {
     const response = await Transaction.aggregate(agg);
     res.status(200).json({
       data: response?.[0],
-      isChartsAvailable: userTransactions?.transactions?.length > 10,
+      isChartsAvailable: userTransactions?.transactions?.length >= 10,
     });
   } catch (error) {
     console.log(error);
