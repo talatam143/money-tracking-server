@@ -292,7 +292,7 @@ export const chartAnalytics = async (req, res) => {
       email: authInfo.email,
     });
 
-    if (!userTransactions || userTransactions.transactions.length <= 10)
+    if (!userTransactions || userTransactions.transactions.length < 10)
       return res
         .status(202)
         .json({ data: { errorMessage: "No Transactions found." } });
