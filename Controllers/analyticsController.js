@@ -273,8 +273,15 @@ export const transactionsAnalytics = async (req, res) => {
     }
 
     const response = await Transaction.aggregate(agg);
+
+    let responseData = response?.[0];
+
+    Object.keys(responseData).forEach((eachData) => {
+      if (responseData[eachData][0]._id === null) delete responseData[eachData];
+    });
+
     res.status(200).json({
-      data: response?.[0],
+      data: responseData,
       isChartsAvailable: userTransactions?.transactions?.length >= 10,
     });
   } catch (error) {
@@ -390,7 +397,15 @@ export const chartAnalytics = async (req, res) => {
       });
     });
 
-    res.status(200).json({ data: responseData });
+    Object.keys(responseData).forEach((eachData) => {
+      if (responseData[eachData].length === 0) delete responseData[eachData];
+    });
+
+    if (Object.keys(responseData).length > 0) {
+      res.status(200).json({ data: responseData });
+    } else {
+      res.status(202).json({ data: { errorMessage: "No charts available" } });
+    }
   } catch (error) {
     console.log(error);
     res.status(500).json({
