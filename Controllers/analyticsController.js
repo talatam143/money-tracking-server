@@ -321,22 +321,6 @@ export const chartAnalytics = async (req, res) => {
         },
       },
       {
-        $match: {
-          "transactions.category": {
-            $exists: true,
-            $ne: null,
-          },
-          "transactions.payment_method": {
-            $exists: true,
-            $ne: null,
-          },
-          "transactions.bank": {
-            $exists: true,
-            $ne: null,
-          },
-        },
-      },
-      {
         $facet: {
           paymentMethodStats: [
             {
@@ -392,9 +376,9 @@ export const chartAnalytics = async (req, res) => {
     let responseData = response?.[0];
 
     Object.keys(responseData).forEach((eachData) => {
-      responseData[eachData].filter((entry) => {
-        entry._id !== "null";
-      });
+      responseData[eachData] = responseData[eachData].filter(
+        (entry) => entry._id !== null
+      );
     });
 
     Object.keys(responseData).forEach((eachData) => {
