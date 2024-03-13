@@ -149,6 +149,12 @@ export const getTransactions = async (req, res) => {
       ];
     }
 
+    if (queries?.monthly?.length === 1 && queries.monthly?.[0] === "true") {
+      agg[agg.length - 1]["$project"].totalAmount = {
+        $sum: "$transactions.amount",
+      };
+    }
+
     const fetchTransactions = await Transaction.aggregate(agg);
 
     if (
