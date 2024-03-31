@@ -89,18 +89,30 @@ export const getTransactions = async (req, res) => {
               );
             }
           } else if (eachQuery === "fromdate" || eachQuery === "date") {
-            let toDate = new Date(
-              eachQuery === "fromdate"
-                ? queries.todate || new Date()
-                : queries.date
+            const fromDateString =
+              eachQuery === "fromdate" ? queries?.fromdate : queries?.date;
+            const toDateString =
+              eachQuery === "fromdate" ? queries.toDate : queries?.date;
+
+            const fromDate = new Date(fromDateString);
+            const toDate = new Date(toDateString);
+
+            const offset = fromDate.getTimezoneOffset();
+            toDate.setHours(23);
+            toDate.setMinutes(59);
+            toDate.setSeconds(59);
+            toDate.setMilliseconds(999);
+
+            const adjustedFromDate = new Date(
+              fromDate.getTime() - offset * 60 * 1000
             );
-            const nextToDate = new Date(toDate);
-            nextToDate.setDate(toDate.getDate() + 1);
+            const adjustedToDate = new Date(
+              toDate.getTime() - offset * 60 * 1000
+            );
+
             matchCriteria[matchObject[eachQuery].dbName] = {
-              $gte: new Date(
-                eachQuery === "fromdate" ? queries?.fromdate : queries?.date
-              ),
-              $lte: new Date(nextToDate),
+              $gte: new Date(adjustedFromDate.toISOString()),
+              $lte: new Date(adjustedToDate.toISOString()),
             };
           } else if (eachQuery === "starred") {
             matchCriteria[matchObject[eachQuery].dbName] = JSON.parse(
